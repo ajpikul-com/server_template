@@ -6,11 +6,11 @@ You will have to run `go mod init` and give it a name to build it.
 
 ```
 -main.go defines a static fileserver, creates a URL path multiplexer, and attaches all paths to it.
--string.go` defines a string server, and provides a function to attach it to a multiplexer.
+-string.go defines a string server, and provides a function to attach it to a multiplexer.
 -systemInit.go handles some logging setup and flags
 ```
 
-The `Makefile` handles some basic building and installing. There's a commented-out line in `make install` which you need to give your server access to port 80. You need to install `libcap2-bin` on debian, at least.\
+The `Makefile` handles some basic building and installing. There's a commented-out line in `make install` which you need to give your server access to port 80. You need to install `libcap2-bin` on debian, at least.
 
 I use letsencrypt and acme certbot to install my certificate. It's actually kind of a nightmare, but I use [auditmatic](github.com/ajpikul-com/auditmatic) to manage all my servers so there's useful stuff in there.
 
