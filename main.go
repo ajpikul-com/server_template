@@ -3,6 +3,7 @@ package main
 import (
 	"net/http"
 
+	"github.com/ajpikul-com/server_utils"
 	"github.com/ajpikul-com/simpauth"
 )
 
@@ -43,7 +44,7 @@ func main() {
 	// Run serveMux
 	go func() {
 		// All http are changed to https using one of my utilities.
-		redirect := RedirectSchemeHandler("https", http.StatusMovedPermanently)
+		redirect := server_utils.RedirectSchemeHandler("https", http.StatusMovedPermanently)
 		serverHTTP := &http.Server{
 			Addr:    ":http",
 			Handler: redirect,
