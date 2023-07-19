@@ -1,5 +1,7 @@
 # ajpikul.com
 
+### THIS IS BADLY OUT OF DATE IN REGARDS TO AUTH, SIMPAUTH IS NOW uWHO
+
 This is a template for starting a webserver. It demonstrates logging, auth, and muxing. It expects SSL.
 
 You will have to run `go mod init` and give it a name to build it.
