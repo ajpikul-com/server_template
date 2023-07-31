@@ -2,49 +2,65 @@ package main
 
 import (
 	"net/http"
+	"time"
 
-	"github.com/ajpikul-com/server_utils"
-	"github.com/ajpikul-com/simpauth"
+	"github.com/ajpikul-com/sutils"
+	"github.com/ajpikul-com/uwho"
+	"github.com/ajpikul-com/uwho/googlelogin"
+	"github.com/ajpikul-com/uwho/usersessioncookie"
 )
 
-// produceMain demonstrates creating a production path (example.com) and a staging path
-// (stage.example.com) pointed to reasonable directories. It's a static server. It uses
-// simpauth to protect the stage and to protect a directory w/in the production path.
 func produceMain(serveMux *http.ServeMux) {
+	productionFileServer := http.FileServer(http.Dir("/var/www/ajpikul.com"))
+	serveMux.Handle("ajpikul.com/", productionFileServer)
+	serveMux.Handle("www.ajpikul.com/", productionFileServer)
+}
 
-	var err error
-	productionFileServer := new(simpauth.Bouncer)
-	err = productionFileServer.Init(http.FileServer(http.Dir("/var/www/example.com")))
-	if err != nil {
-		panic(err)
+func produceStage(serveMux *http.ServeMux) {
+	// ** SET UP UWHO
+	cookieSessions := usersessioncookie.New(7*24*time.Hour, globalConfig.PrivateKey)
+	googleIdent := googlelogin.New(globalConfig.GoogleClientID)
+
+	loginScreen := googleIdent.DefaultLoginPortal("/login")
+	stageFileServer := uwho.New(http.FileServer(http.Dir("/var/www/stage.ajpikul.com")),
+		&googlelogin.DefaultLoginResult{},
+		loginScreen,
+		&googlelogin.RedirectHome{},
+		"/login",
+		"/logout",
+		&stageFactory{},
+	)
+	stageFileServer.AddIdentifier(googleIdent)
+	stageFileServer.AttachSessionManager(cookieSessions)
+	// ** CREATE HOOKS FOR UWHO
+	// State can't access session directly, session not configured to refresh (should be), so we must put it in a hook.
+	refreshSession := func(stateCoord uwho.ReqByCoord, w http.ResponseWriter, r *http.Request) error {
+		if !stateCoord.(*stageState).failedAuth {
+			w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+			w.Header().Set("Pragma", "no-cache")
+			w.Header().Set("Expires", "0")
+		}
+		return nil
 	}
-	serveMux.Handle("example.com/", productionFileServer)
-	serveMux.Handle("www.example.com/", productionFileServer)
+	stageFileServer.SetHooks(&stageFileServer.Hooks.AboutToLoad, []uwho.Hook{&refreshSession})
 
-	stageFileServer := new(simpauth.Bouncer)
-	err = stageFileServer.Init(http.FileServer(http.Dir("/var/www/stage.example.com")))
-	if err != nil {
-		panic(err)
-	}
-
-	serveMux.Handle("stage.example.com/", stageFileServer)
-
+	// FINALLY ATTACH MUX
+	serveMux.Handle("stage.ajpikul.com/", &stageFileServer)
 }
 
 func main() {
 	var err error
 	serveMux := http.NewServeMux()
 
-	// Attach paths to serveMux
 	produceMain(serveMux)
-	produceString(serveMux)
+	produceStage(serveMux)
+	produceSysBoss(serveMux)
+	//produceDev(serveMux)
+	//produceWiki(serveMux)
 
-	defaultLogger.Info("Running serverMux")
-
-	// Run serveMux
 	go func() {
-		// All http are changed to https using one of my utilities.
-		redirect := server_utils.RedirectSchemeHandler("https", http.StatusMovedPermanently)
+		// Redirect this
+		redirect := sutils.RedirectSchemeHandler("https", http.StatusMovedPermanently)
 		serverHTTP := &http.Server{
 			Addr:    ":http",
 			Handler: redirect,
@@ -58,10 +74,10 @@ func main() {
 
 	serverHTTPS := &http.Server{
 		Addr:    ":https",
-		Handler: serveMux,
+		Handler: serveMux, // you could wrap servemux and then call it's ServeHTTP to always serve a certain header
 	}
 
-	err = serverHTTPS.ListenAndServeTLS(*fullChain, *privKey)
+	err = serverHTTPS.ListenAndServeTLS(globalConfig.FullChain, globalConfig.PrivateKey)
 	if err != nil {
 		panic(err)
 	}
