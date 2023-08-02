@@ -27,4 +27,4 @@ official:
 	-GOPROXY=direct go get -u && go mod tidy && go build
 	cp go.mod go.mod.official
 	cp go.sum go.sum.official
-	-rm local
+	-rm local || true
